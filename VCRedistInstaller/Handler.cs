@@ -43,7 +43,6 @@ namespace VCRedistInstaller
 
             if (elevated)
             {
-                // TODO: Show the window to indicate we're handling the pre-reqs..
                 await _installer.DownloadAndInstall(toBeInstalled);
             }
             else
