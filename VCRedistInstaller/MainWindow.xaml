@@ -5,8 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:VCRedistInstaller"
         mc:Ignorable="d"
-        Title="MainWindow" Height="350" Width="525">
+        Title="Visual Studio Runtime installer" Height="240" Width="400" ResizeMode="NoResize">
     <Grid>
-        
+        <TextBlock FontSize="24" HorizontalAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Center" Text="Installing Visual Studio Runtimes, please wait..."></TextBlock>
     </Grid>
 </Window>
