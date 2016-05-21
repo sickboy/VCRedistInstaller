@@ -29,12 +29,15 @@ namespace VCRedistInstaller
 
         private async Task HandleInternal()
         {
+            const string elevatedOpt = "--elevated";
+            const string forceOpt = "--force";
             var commandLineArgs = Environment.GetCommandLineArgs();
-            const string value = "--elevated";
-            var elevated = commandLineArgs.Contains(value);
-            var cli = commandLineArgs.Skip(1).Where(x => x != value).ToArray();
-            var versions = cli.Select(x => (VCRedists) Enum.Parse(typeof (VCRedists), x)).ToArray();
-            var toBeInstalled = await _installer.Checker(versions);
+            var cli = Environment.GetCommandLineArgs().Skip(1);
+            var elevated = cli.Contains(elevatedOpt);
+            var forced = cli.Contains(forceOpt);
+            var versionsCli = cli.Where(x => !x.StartsWith("--")).ToArray();
+            var versions = versionsCli.Select(x => (VCRedists) Enum.Parse(typeof (VCRedists), x)).ToArray();
+            var toBeInstalled = forced ? versions : await _installer.Checker(versions);
             if (!toBeInstalled.Any())
             {
                 Environment.Exit(0);
@@ -50,7 +53,7 @@ namespace VCRedistInstaller
                 using (
                     var p =
                         Process.Start(new ProcessStartInfo(commandLineArgs[0],
-                            string.Join(" ", new[] {value}.Concat(cli)))
+                            string.Join(" ", new[] {elevatedOpt, forced ? forceOpt : null}.Where(x => x != null).Concat(versionsCli)))
                         {
                             Verb = "runas"
                         })) p.WaitForExit();
