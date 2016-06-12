@@ -16,6 +16,8 @@ namespace VCRedistInstaller
         VS2015 = 14
     }
 
+    // http://stackoverflow.com/questions/12206314/detect-if-visual-c-redistributable-for-visual-studio-2012-is-installed
+    // http://stackoverflow.com/questions/21702199/how-to-determine-if-the-32-bit-visual-studio-2013-redistributable-is-installed-o
     public class VcRedistInstaller
     {
         public async Task<VcRedistInfo[]> Checker(params VcRedistInfo[] versions)
@@ -84,13 +86,16 @@ namespace VCRedistInstaller
             }
         }
 
-        private static bool VerifyRegistry(VcRedistInfo info, RegistryView bit)
+        private static bool VerifyRegistry(VcRedistInfo info, RegistryView bit) => VerifyDevDiv(info, bit) && VerifyVS(info, bit);
+
+        private static bool VerifyVS(VcRedistInfo info, RegistryView bit)
         {
-            var regVersion = $"{(int) info.Version}.0";
-            using (var reg = OpenRegistry(bit)
-                .OpenSubKey($@"SOFTWARE\Microsoft\DevDiv\vc\Servicing\{regVersion}\RuntimeMinimum"))
+            var regVersion = $"{(int)info.Version}.0";
+            using (var reg = OpenRegistry(RegistryView.Registry32) // must look up in 32-bit registry
+                .OpenSubKey($@"SOFTWARE\Microsoft\VisualStudio\{regVersion}\VC\Runtimes\" +
+                            (bit == RegistryView.Registry32 ? "x86" : "x64")))
             {
-                if (reg != null && TryConfirm(reg))
+                if (reg != null && TryConfirm(reg, "Installed"))
                 {
                     return true;
                 }
@@ -98,11 +103,25 @@ namespace VCRedistInstaller
             return false;
         }
 
-        private static bool TryConfirm(RegistryKey reg)
+        private static bool VerifyDevDiv(VcRedistInfo info, RegistryView bit)
+        {
+            var regVersion = $"{(int) info.Version}.0";
+            using (var reg = OpenRegistry(bit)
+                .OpenSubKey($@"SOFTWARE\Microsoft\DevDiv\vc\Servicing\{regVersion}\RuntimeMinimum"))
+            {
+                if (reg != null && TryConfirm(reg, "Install"))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool TryConfirm(RegistryKey reg, string parameter)
         {
             try
             {
-                return Convert.ToInt64(reg.GetValue("Install")) == 1;
+                return Convert.ToInt64(reg.GetValue(parameter)) == 1;
             }
             catch (Exception ex)
             {
