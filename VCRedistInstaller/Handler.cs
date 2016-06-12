@@ -36,7 +36,10 @@ namespace VCRedistInstaller
             var elevated = cli.Contains(elevatedOpt);
             var forced = cli.Contains(forceOpt);
             var versionsCli = cli.Where(x => !x.StartsWith("--")).ToArray();
-            var versions = versionsCli.Select(x => (VCRedists) Enum.Parse(typeof (VCRedists), x)).ToArray();
+            var versions =
+                versionsCli.Select(x => (VCRedists) Enum.Parse(typeof (VCRedists), x))
+                    .Select(VcRedistInfo.GetInfo)
+                    .ToArray();
             var toBeInstalled = forced ? versions : await _installer.Checker(versions);
             if (!toBeInstalled.Any())
             {

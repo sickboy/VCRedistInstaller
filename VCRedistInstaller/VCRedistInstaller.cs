@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -18,24 +18,36 @@ namespace VCRedistInstaller
 
     public class VcRedistInstaller
     {
-        public async Task<VCRedists[]> Checker(params VCRedists[] versions)
-            => versions.Where(v => !CheckVcRedistInstalled($"{(int)v}.0")).ToArray();
+        public async Task<VcRedistInfo[]> Checker(params VcRedistInfo[] versions)
+            => versions.Where(v => !CheckVcRedistInstalled(v)).ToArray();
 
-        public async Task DownloadAndInstall(params VCRedists[] versions)
+        public async Task DownloadAndInstall(params VcRedistInfo[] versions)
         {
-            var tasks = new List<Task>();
-            foreach (var v in versions)
+            using (var bc = new BlockingCollection<string>())
             {
-                var fileName = Path.Combine(Path.GetTempPath(), $"vcredist_x86-{v}.exe");
-                await DownloadVersion(fileName, GetUrl(v));
-                tasks.Add(Install(fileName));
+                var t = Task.Factory.StartNew(async () =>
+                {
+                    foreach (var c in bc.GetConsumingEnumerable())
+                    {
+                        await Install(c);
+                    }
+                }).Unwrap();
+                foreach (var v in versions)
+                {
+                    var fileName = Path.Combine(Path.GetTempPath(), $"vcredist_x86-{v}.exe");
+                    await DownloadVersion(fileName, v.Url);
+                    bc.Add(fileName);
+                }
+                bc.CompleteAdding();
+                await t;
             }
-            await Task.WhenAll(tasks);
         }
 
         private Task Install(string fileName) => Task.Factory.StartNew(() =>
         {
             using (var p = Process.Start(fileName, "/q /norestart"))
+                p.WaitForExit();
+            using (var p = Process.Start(fileName, "/q /repair /norestart"))
                 p.WaitForExit();
         });
 
@@ -47,25 +59,103 @@ namespace VCRedistInstaller
             }
         }
 
-        private static string GetUrl(VCRedists v)
+        private static bool CheckVcRedistInstalled(VcRedistInfo info, RegistryView bit = RegistryView.Registry32)
+            => VerifyRegistry(info, bit) && VerifySystemFile(info, bit);
+
+        private static bool VerifySystemFile(VcRedistInfo info, RegistryView bit)
+        {
+            switch (bit)
+            {
+                case RegistryView.Registry32:
+                {
+                    var folder = Environment.GetFolderPath(Environment.SpecialFolder.SystemX86);
+                    return File.Exists(Path.Combine(folder, info.SystemFile));
+                }
+                case RegistryView.Registry64:
+                {
+                    var folder = Environment.GetFolderPath(Environment.SpecialFolder.System);
+                    return File.Exists(Path.Combine(folder, info.SystemFile));
+                }
+                // TODO: This would be 64-bit on 64-bit runtime, and 32-bit on 32-bit runtime :S
+                case RegistryView.Default:
+                    throw new NotSupportedException(bit + " is not supported");
+                default:
+                    throw new NotSupportedException(bit + " is not supported");
+            }
+        }
+
+        private static bool VerifyRegistry(VcRedistInfo info, RegistryView bit)
+        {
+            var regVersion = $"{(int) info.Version}.0";
+            using (var reg = OpenRegistry(bit)
+                .OpenSubKey($@"SOFTWARE\Microsoft\DevDiv\vc\Servicing\{regVersion}\RuntimeMinimum"))
+            {
+                if (reg != null && TryConfirm(reg))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool TryConfirm(RegistryKey reg)
+        {
+            try
+            {
+                return Convert.ToInt64(reg.GetValue("Install")) == 1;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                return false;
+            }
+        }
+
+        static RegistryKey OpenRegistry(RegistryView bit = RegistryView.Registry32,
+            RegistryHive hive = RegistryHive.LocalMachine) => RegistryKey.OpenBaseKey(hive, bit);
+    }
+
+    public class VcRedistInfo
+    {
+        private static readonly VcRedistInfo Vs2012 = new VcRedistInfo(VCRedists.VS2012,
+            "http://download.microsoft.com/download/1/6/B/16B06F60-3B20-4FF2-B699-5E9B7962F9AE/VSU_4/vcredist_x86.exe",
+            "msvcr110.dll");
+
+        private static readonly VcRedistInfo Vs2013 = new VcRedistInfo(VCRedists.VS2013,
+            "http://download.microsoft.com/download/2/E/6/2E61CFA4-993B-4DD4-91DA-3737CD5CD6E3/vcredist_x86.exe",
+            "msvcr120.dll");
+
+        // Update 2
+        private static readonly VcRedistInfo Vs2015 = new VcRedistInfo(VCRedists.VS2015,
+            "https://download.microsoft.com/download/0/5/0/0504B211-6090-48B1-8DEE-3FF879C29968/vc_redist.x86.exe",
+            "vcruntime140.dll");
+
+        private VcRedistInfo(VCRedists version, string url, string systemFile)
+        {
+            Version = version;
+            Url = url;
+            SystemFile = systemFile;
+        }
+
+        public VCRedists Version { get; }
+        public string Url { get; }
+        public string SystemFile { get; }
+
+        public static VcRedistInfo GetInfo(VCRedists v)
         {
             switch (v)
             {
                 case VCRedists.VS2012:
                 {
-                    return
-                        "http://download.microsoft.com/download/1/6/B/16B06F60-3B20-4FF2-B699-5E9B7962F9AE/VSU_4/vcredist_x86.exe";
+                    return Vs2012;
                 }
                 case VCRedists.VS2013:
                 {
-                    return
-                        "http://download.microsoft.com/download/2/E/6/2E61CFA4-993B-4DD4-91DA-3737CD5CD6E3/vcredist_x86.exe";
+                    return Vs2013;
                 }
                 case VCRedists.VS2015:
                 {
-                        // Update 2
-                    return
-                        "https://download.microsoft.com/download/0/5/0/0504B211-6090-48B1-8DEE-3FF879C29968/vc_redist.x86.exe";
+                    return Vs2015;
                 }
                 default:
                 {
@@ -73,19 +163,5 @@ namespace VCRedistInstaller
                 }
             }
         }
-
-        private static bool CheckVcRedistInstalled(string regVersion, RegistryView bit = RegistryView.Registry32)
-        {
-            using (var reg = OpenRegistry(bit)
-                .OpenSubKey($@"SOFTWARE\Microsoft\DevDiv\vc\Servicing\{regVersion}\RuntimeMinimum"))
-            {
-                if (reg != null)
-                    return true;
-            }
-            return false;
-        }
-
-        static RegistryKey OpenRegistry(RegistryView bit = RegistryView.Registry32,
-            RegistryHive hive = RegistryHive.LocalMachine) => RegistryKey.OpenBaseKey(hive, bit);
     }
 }
