@@ -18,6 +18,8 @@ namespace VCRedistInstaller
 
     // http://stackoverflow.com/questions/12206314/detect-if-visual-c-redistributable-for-visual-studio-2012-is-installed
     // http://stackoverflow.com/questions/21702199/how-to-determine-if-the-32-bit-visual-studio-2013-redistributable-is-installed-o
+    // https://social.msdn.microsoft.com/Forums/sqlserver/en-US/c599b7e9-ee1a-4491-8ae4-523ffcf201c2/how-to-detect-the-msvc-runtime-2013-installed-on-system-or-not?forum=vssetup
+    // https://community.flexerasoftware.com/showthread.php?220517-Handling-Detection-of-Visual-C-2015-x86-Runtime-Without-Checking-Product
     public class VcRedistInstaller
     {
         public async Task<VcRedistInfo[]> Checker(params VcRedistInfo[] versions)
