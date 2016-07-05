@@ -138,12 +138,14 @@ namespace VCRedistInstaller
 
     public class VcRedistInfo
     {
+        // Update 4
         private static readonly VcRedistInfo Vs2012 = new VcRedistInfo(VCRedists.VS2012,
             "http://download.microsoft.com/download/1/6/B/16B06F60-3B20-4FF2-B699-5E9B7962F9AE/VSU_4/vcredist_x86.exe",
             "msvcr110.dll");
 
+        // Update 5
         private static readonly VcRedistInfo Vs2013 = new VcRedistInfo(VCRedists.VS2013,
-            "http://download.microsoft.com/download/2/E/6/2E61CFA4-993B-4DD4-91DA-3737CD5CD6E3/vcredist_x86.exe",
+            "http://download.microsoft.com/download/C/C/2/CC2DF5F8-4454-44B4-802D-5EA68D086676/vcredist_x86.exe",
             "msvcr120.dll");
 
         // Update 3
