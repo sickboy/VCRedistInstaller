@@ -38,7 +38,7 @@ namespace VCRedistInstaller
                 }).Unwrap();
                 foreach (var v in versions)
                 {
-                    var fileName = Path.Combine(Path.GetTempPath(), $"vcredist_x86-{v}.exe");
+                    var fileName = Path.Combine(Path.GetTempPath(), $"vcredist_x86-{v.Version}.exe");
                     await DownloadVersion(fileName, v.Url);
                     bc.Add(fileName);
                 }
