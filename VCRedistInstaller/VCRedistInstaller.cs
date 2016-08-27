@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -31,24 +32,45 @@ namespace VCRedistInstaller
             {
                 var t = Task.Factory.StartNew(async () =>
                 {
+                    var installErrors = new List<Exception>();
                     foreach (var c in bc.GetConsumingEnumerable())
                     {
-                        await Install(c);
+                        try
+                        {
+                            await Install(c);
+                        }
+                        catch (Exception ex)
+                        {
+                            installErrors.Add(ex);
+                        }
                     }
+                    if (installErrors.Any())
+                        throw new AggregateException("An error occurred during Installing", installErrors);
                 }).Unwrap();
+                var downloadErrors = new List<Exception>();
                 foreach (var v in versions)
                 {
-                    var fileName = Path.Combine(Path.GetTempPath(), $"vcredist_x86-{v.Version}.exe");
-                    await DownloadVersion(fileName, v.Url);
-                    bc.Add(fileName);
+                    try
+                    {
+                        var fileName = Path.Combine(Path.GetTempPath(), $"vcredist_x86-{v.Version}.exe");
+                        await DownloadVersion(fileName, v.Url);
+                        bc.Add(fileName);
+                    }
+                    catch (Exception ex)
+                    {
+                        downloadErrors.Add(ex);
+                    }
                 }
                 bc.CompleteAdding();
                 await t;
+                if (downloadErrors.Any())
+                    throw new AggregateException("An error occurred during downloading", downloadErrors);
             }
         }
 
         private Task Install(string fileName) => Task.Factory.StartNew(() =>
         {
+            // TODO: Error handling
             using (var p = Process.Start(fileName, "/q /norestart"))
                 p.WaitForExit();
             using (var p = Process.Start(fileName, "/q /repair /norestart"))
