@@ -150,7 +150,7 @@ namespace VCRedistInstaller
 
         // Update 3
         private static readonly VcRedistInfo Vs2015 = new VcRedistInfo(VCRedists.VS2015,
-            "http://download.microsoft.com/download/4/2/F/42FF78CE-8DE0-4C88-AD7A-5F8DFFB49F74/vc_redist.x86.exe",
+            "http://download.microsoft.com/download/6/D/F/6DF3FF94-F7F9-4F0B-838C-A328D1A7D0EE/vc_redist.x86.exe",
             "vcruntime140.dll");
 
         private VcRedistInfo(VCRedists version, string url, string systemFile)
